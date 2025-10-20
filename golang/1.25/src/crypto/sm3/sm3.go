@@ -161,7 +161,7 @@ func (d *digest) Write(p []byte) (int, error) {
 
 			copy(d.buffer[partial:], p[:offset])
 
-			length -= offset 
+			length -= offset
 
 			sm3_transform(d.state[:], d.buffer[:])
 
