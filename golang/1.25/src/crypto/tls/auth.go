@@ -27,7 +27,12 @@ func verifyHandshakeSignature(sigType uint8, pubkey crypto.PublicKey, hashFunc c
 		if !ok {
 			return fmt.Errorf("expected an ECDSA public key, got %T", pubkey)
 		}
-		if !ecdsa.VerifyASN1(pubKey, signed, sig) {
+		// or check pubkey.Curve ?
+		if hashFunc == directSigning {
+			if !ecdsa.SM2VerifyASN1(pubKey, signed, sig, []byte("TLSv1.3+GM+Cipher+Suite")) {
+				return errors.New("ECDSA SM2 verification failure")
+			}
+		} else if !ecdsa.VerifyASN1(pubKey, signed, sig) {
 			return errors.New("ECDSA verification failure")
 		}
 	case signatureEd25519:
@@ -102,7 +107,7 @@ func typeAndHashFromSignatureScheme(signatureAlgorithm SignatureScheme) (sigType
 		sigType = signaturePKCS1v15
 	case PSSWithSHA256, PSSWithSHA384, PSSWithSHA512:
 		sigType = signatureRSAPSS
-	case ECDSAWithSHA1, ECDSAWithP256AndSHA256, ECDSAWithP384AndSHA384, ECDSAWithP521AndSHA512:
+	case ECDSAWithSHA1, ECDSAWithP256AndSHA256, ECDSAWithP384AndSHA384, ECDSAWithP521AndSHA512, SM2SIG_SM3:
 		sigType = signatureECDSA
 	case Ed25519:
 		sigType = signatureEd25519
@@ -118,7 +123,7 @@ func typeAndHashFromSignatureScheme(signatureAlgorithm SignatureScheme) (sigType
 		hash = crypto.SHA384
 	case PKCS1WithSHA512, PSSWithSHA512, ECDSAWithP521AndSHA512:
 		hash = crypto.SHA512
-	case Ed25519:
+	case Ed25519, SM2SIG_SM3:
 		hash = directSigning
 	default:
 		return 0, 0, fmt.Errorf("unsupported signature algorithm: %v", signatureAlgorithm)
@@ -183,6 +188,8 @@ func signatureSchemesForPublicKey(version uint16, pub crypto.PublicKey) []Signat
 			return []SignatureScheme{ECDSAWithP384AndSHA384}
 		case elliptic.P521():
 			return []SignatureScheme{ECDSAWithP521AndSHA512}
+		case elliptic.SM2():
+			return []SignatureScheme{SM2SIG_SM3}
 		default:
 			return nil
 		}
@@ -267,6 +274,7 @@ func unsupportedCertificateError(cert *Certificate) error {
 		case elliptic.P256():
 		case elliptic.P384():
 		case elliptic.P521():
+		case elliptic.SM2():
 		default:
 			return fmt.Errorf("tls: unsupported certificate curve (%s)", pub.Curve.Params().Name)
 		}

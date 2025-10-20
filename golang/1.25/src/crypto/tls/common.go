@@ -150,6 +150,7 @@ const (
 	CurveP521      CurveID = 25
 	X25519         CurveID = 29
 	X25519MLKEM768 CurveID = 4588
+	CurveSM2       CurveID = 41
 )
 
 func isTLS13OnlyKeyExchange(curve CurveID) bool {
@@ -410,6 +411,9 @@ const (
 
 	// EdDSA algorithms.
 	Ed25519 SignatureScheme = 0x0807
+
+	// RFC 8998
+	SM2SIG_SM3 SignatureScheme = 0x0708
 
 	// Legacy signature and hash algorithms for TLS 1.2.
 	PKCS1WithSHA1 SignatureScheme = 0x0201
@@ -1416,6 +1420,8 @@ func (chi *ClientHelloInfo) SupportsCertificate(c *Certificate) error {
 				curve = CurveP384
 			case elliptic.P521():
 				curve = CurveP521
+			case elliptic.SM2():
+				curve = CurveSM2
 			default:
 				return supportsRSAFallback(unsupportedCertificateError(c))
 			}

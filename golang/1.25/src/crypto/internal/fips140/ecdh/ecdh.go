@@ -51,6 +51,7 @@ const (
 	p256 curveID = "P-256"
 	p384 curveID = "P-384"
 	p521 curveID = "P-521"
+	sm2  curveID = "SM2"
 )
 
 type Curve[P Point[P]] struct {
@@ -61,7 +62,7 @@ type Curve[P Point[P]] struct {
 
 // Point is a generic constraint for the [nistec] Point types.
 type Point[P any] interface {
-	*nistec.P224Point | *nistec.P256Point | *nistec.P384Point | *nistec.P521Point
+	*nistec.P224Point | *nistec.P256Point | *nistec.P384Point | *nistec.P521Point | *nistec.SM2Point
 	Bytes() []byte
 	BytesX() ([]byte, error)
 	SetBytes([]byte) (P, error)
@@ -98,6 +99,20 @@ var p256Order = []byte{
 	0xbc, 0xe6, 0xfa, 0xad, 0xa7, 0x17, 0x9e, 0x84,
 	0xf3, 0xb9, 0xca, 0xc2, 0xfc, 0x63, 0x25, 0x51,
 }
+
+func SM2() *Curve[*nistec.SM2Point] {
+	return &Curve[*nistec.SM2Point]{
+		curve:    sm2,
+		newPoint: nistec.NewSM2Point,
+		N:        sm2Order,
+	}
+}
+
+var sm2Order = []byte{
+	0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0x72, 0x03, 0xdf, 0x6b, 0x21, 0xc6, 0x05, 0x2b,
+	0x53, 0xbb, 0xf4, 0x09, 0x39, 0xd5, 0x41, 0x23}
 
 func P384() *Curve[*nistec.P384Point] {
 	return &Curve[*nistec.P384Point]{

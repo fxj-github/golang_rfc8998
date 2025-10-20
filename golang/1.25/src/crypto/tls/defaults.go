@@ -19,9 +19,9 @@ var tlsmlkem = godebug.New("tlsmlkem")
 // well as the preference order.
 func defaultCurvePreferences() []CurveID {
 	if tlsmlkem.Value() == "0" {
-		return []CurveID{X25519, CurveP256, CurveP384, CurveP521}
+		return []CurveID{CurveSM2, X25519, CurveP256, CurveP384, CurveP521}
 	}
-	return []CurveID{X25519MLKEM768, X25519, CurveP256, CurveP384, CurveP521}
+	return []CurveID{CurveSM2, X25519MLKEM768, X25519, CurveP256, CurveP384, CurveP521}
 }
 
 // defaultSupportedSignatureAlgorithms returns the signature and hash algorithms that
@@ -42,6 +42,7 @@ func defaultSupportedSignatureAlgorithms() []SignatureScheme {
 		ECDSAWithP521AndSHA512,
 		PKCS1WithSHA1,
 		ECDSAWithSHA1,
+		SM2SIG_SM3,
 	}
 }
 
@@ -80,6 +81,7 @@ func defaultCipherSuites(aesGCMPreferred bool) []uint16 {
 //
 //go:linkname defaultCipherSuitesTLS13
 var defaultCipherSuitesTLS13 = []uint16{
+	TLS_SM4_GCM_SM3,
 	TLS_AES_128_GCM_SHA256,
 	TLS_AES_256_GCM_SHA384,
 	TLS_CHACHA20_POLY1305_SHA256,
@@ -96,6 +98,7 @@ var defaultCipherSuitesTLS13 = []uint16{
 //
 //go:linkname defaultCipherSuitesTLS13NoAES
 var defaultCipherSuitesTLS13NoAES = []uint16{
+	TLS_SM4_GCM_SM3,
 	TLS_CHACHA20_POLY1305_SHA256,
 	TLS_AES_128_GCM_SHA256,
 	TLS_AES_256_GCM_SHA384,

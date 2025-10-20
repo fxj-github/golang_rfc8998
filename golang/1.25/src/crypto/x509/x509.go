@@ -231,6 +231,7 @@ const (
 	SHA384WithRSAPSS
 	SHA512WithRSAPSS
 	PureEd25519
+	SM2WithSM3
 )
 
 func (algo SignatureAlgorithm) isRSAPSS() bool {
@@ -346,6 +347,7 @@ var (
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
 	oidSignatureEd25519         = asn1.ObjectIdentifier{1, 3, 101, 112}
+	oidSignatureSM2WithSM3      = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 501}
 
 	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
 	oidSHA384 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
@@ -384,6 +386,7 @@ var signatureAlgorithmDetails = []struct {
 	{ECDSAWithSHA384, "ECDSA-SHA384", oidSignatureECDSAWithSHA384, emptyRawValue, ECDSA, crypto.SHA384, false},
 	{ECDSAWithSHA512, "ECDSA-SHA512", oidSignatureECDSAWithSHA512, emptyRawValue, ECDSA, crypto.SHA512, false},
 	{PureEd25519, "Ed25519", oidSignatureEd25519, emptyRawValue, Ed25519, crypto.Hash(0) /* no pre-hashing */, false},
+	{SM2WithSM3, "SM2-SM3", oidSignatureSM2WithSM3, emptyRawValue, ECDSA, crypto.Hash(0) /* fixed internal hashing */, false},
 }
 
 var emptyRawValue = asn1.RawValue{}
@@ -532,6 +535,7 @@ var (
 	oidNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
 	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
 	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
+	oidNamedCurveSM2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301}
 )
 
 func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
@@ -544,6 +548,8 @@ func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
 		return elliptic.P384()
 	case oid.Equal(oidNamedCurveP521):
 		return elliptic.P521()
+	case oid.Equal(oidNamedCurveSM2):
+		return elliptic.SM2()
 	}
 	return nil
 }
@@ -558,6 +564,8 @@ func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 		return oidNamedCurveP384, true
 	case elliptic.P521():
 		return oidNamedCurveP521, true
+	case elliptic.SM2():
+		return oidNamedCurveSM2, true
 	}
 
 	return nil, false
@@ -974,7 +982,7 @@ func checkSignature(algo SignatureAlgorithm, signed, signature []byte, publicKey
 
 	switch hashType {
 	case crypto.Hash(0):
-		if pubKeyAlgo != Ed25519 {
+		if pubKeyAlgo != Ed25519 && pubKeyAlgo != ECDSA {
 			return ErrUnsupportedAlgorithm
 		}
 	case crypto.MD5:
@@ -1533,6 +1541,8 @@ func signingParamsForKey(key crypto.Signer, sigAlgo SignatureAlgorithm) (Signatu
 			defaultAlgo = ECDSAWithSHA384
 		case elliptic.P521():
 			defaultAlgo = ECDSAWithSHA512
+		case elliptic.SM2():
+			defaultAlgo = SM2WithSM3
 		default:
 			return 0, ai, errors.New("x509: unsupported elliptic curve")
 		}

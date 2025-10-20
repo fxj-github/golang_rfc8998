@@ -16,6 +16,7 @@ import (
 	"crypto/rc4"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sm4"
 	"fmt"
 	"hash"
 	"internal/cpu"
@@ -58,6 +59,8 @@ func CipherSuites() []*CipherSuite {
 		{TLS_AES_128_GCM_SHA256, "TLS_AES_128_GCM_SHA256", supportedOnlyTLS13, false},
 		{TLS_AES_256_GCM_SHA384, "TLS_AES_256_GCM_SHA384", supportedOnlyTLS13, false},
 		{TLS_CHACHA20_POLY1305_SHA256, "TLS_CHACHA20_POLY1305_SHA256", supportedOnlyTLS13, false},
+
+		{TLS_SM4_GCM_SM3, "TLS_SM4_GCM_SM3", supportedOnlyTLS13, false},
 
 		{TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", supportedUpToTLS12, false},
 		{TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", supportedUpToTLS12, false},
@@ -214,6 +217,7 @@ var cipherSuitesTLS13 = []*cipherSuiteTLS13{ // TODO: replace with a map.
 	{TLS_AES_128_GCM_SHA256, 16, aeadAESGCMTLS13, crypto.SHA256},
 	{TLS_CHACHA20_POLY1305_SHA256, 32, aeadChaCha20Poly1305, crypto.SHA256},
 	{TLS_AES_256_GCM_SHA384, 32, aeadAESGCMTLS13, crypto.SHA384},
+	{TLS_SM4_GCM_SM3, 16, aeadSM4GCM, crypto.SM3},
 }
 
 // cipherSuitesPreferenceOrder is the order in which we'll select (on the
@@ -586,6 +590,24 @@ func aeadChaCha20Poly1305(key, nonceMask []byte) aead {
 	return ret
 }
 
+func aeadSM4GCM(key, nonceMask []byte) aead {
+	if len(nonceMask) != aeadNonceLength {
+		panic("tls: internal error: wrong nonce length")
+	}
+	c, err := sm4.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	aead, err := cipher.NewGCM(c)
+	if err != nil {
+		panic(err)
+	}
+
+	ret := &xorNonceAEAD{aead: aead}
+	copy(ret.nonceMask[:], nonceMask)
+	return ret
+}
+
 type constantTimeHash interface {
 	hash.Hash
 	ConstantTimeSum(b []byte) []byte
@@ -712,6 +734,8 @@ const (
 	TLS_AES_128_GCM_SHA256       uint16 = 0x1301
 	TLS_AES_256_GCM_SHA384       uint16 = 0x1302
 	TLS_CHACHA20_POLY1305_SHA256 uint16 = 0x1303
+
+	TLS_SM4_GCM_SM3 uint16 = 0x00c6
 
 	// TLS_FALLBACK_SCSV isn't a standard cipher suite but an indicator
 	// that the client is doing version fallback. See RFC 7507.

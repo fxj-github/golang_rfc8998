@@ -177,6 +177,24 @@ var p256 = &nistCurve{
 	},
 }
 
+func SM2() Curve { return sm2 }
+
+var sm2 = &nistCurve{
+	name: "SM2",
+	generate: func(r io.Reader) (*ecdh.PrivateKey, error) {
+		return ecdh.GenerateKey(ecdh.SM2(), r)
+	},
+	newPrivateKey: func(b []byte) (*ecdh.PrivateKey, error) {
+		return ecdh.NewPrivateKey(ecdh.SM2(), b)
+	},
+	newPublicKey: func(publicKey []byte) (*ecdh.PublicKey, error) {
+		return ecdh.NewPublicKey(ecdh.SM2(), publicKey)
+	},
+	sharedSecret: func(priv *ecdh.PrivateKey, pub *ecdh.PublicKey) (sharedSecret []byte, err error) {
+		return ecdh.ECDH(ecdh.SM2(), priv, pub)
+	},
+}
+
 // P384 returns a [Curve] which implements NIST P-384 (FIPS 186-3, section D.2.4),
 // also known as secp384r1.
 //

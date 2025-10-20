@@ -78,6 +78,8 @@ func curveForCurveID(id CurveID) (ecdh.Curve, bool) {
 		return ecdh.P384(), true
 	case CurveP521:
 		return ecdh.P521(), true
+	case CurveSM2:
+		return ecdh.SM2(), true
 	default:
 		return nil, false
 	}

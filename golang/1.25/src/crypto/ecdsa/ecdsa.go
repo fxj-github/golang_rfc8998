@@ -205,6 +205,8 @@ func curveToECDH(c elliptic.Curve) ecdh.Curve {
 		return ecdh.P384()
 	case elliptic.P521():
 		return ecdh.P521()
+	case elliptic.SM2():
+		return ecdh.SM2()
 	default:
 		return nil
 	}
@@ -323,6 +325,9 @@ func privateKeyBytes[P ecdsa.Point[P]](c *ecdsa.Curve[P], priv *PrivateKey) ([]b
 // function used to produce digest and priv.Curve must be one of
 // [elliptic.P224], [elliptic.P256], [elliptic.P384], or [elliptic.P521].
 func (priv *PrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	if sm2opts, ok := opts.(*SM2Options); ok {
+		return signASN1(rand, priv, digest, []byte(sm2opts.getID()))
+	}
 	if rand == nil {
 		return signRFC6979(priv, digest, opts)
 	}
@@ -356,6 +361,7 @@ func GenerateKey(c elliptic.Curve, rand io.Reader) (*PrivateKey, error) {
 	case elliptic.P521().Params():
 		return generateFIPS(c, ecdsa.P521(), rand)
 	default:
+		// SM2
 		return generateLegacy(c, rand)
 	}
 }
@@ -384,6 +390,10 @@ var errNoAsm = errors.New("no assembly implementation available")
 // as rand. Note that the returned signature does not depend deterministically on
 // the bytes read from rand, and may change between calls and/or between versions.
 func SignASN1(rand io.Reader, priv *PrivateKey, hash []byte) ([]byte, error) {
+	return signASN1(rand, priv, hash, nil)
+}
+
+func signASN1(rand io.Reader, priv *PrivateKey, hash []byte, id []byte) ([]byte, error) {
 	randutil.MaybeReadByte(rand)
 
 	if boring.Enabled && rand == boring.RandReader {
@@ -394,6 +404,17 @@ func SignASN1(rand io.Reader, priv *PrivateKey, hash []byte) ([]byte, error) {
 		return boring.SignMarshalECDSA(b, hash)
 	}
 	boring.UnreachableExceptTests()
+
+	if is_sm2_curve(priv.PublicKey.Curve) {
+		if id == nil {
+			id = []byte(sm2_default_id)
+		}
+		r, s, err := sm2Sign(rand, priv, hash, id)
+		if err != nil {
+			return nil, err
+		}
+		return encodeSignature(r.Bytes(), s.Bytes())
+	}
 
 	switch priv.Curve.Params() {
 	case elliptic.P224().Params():
@@ -507,6 +528,10 @@ func VerifyASN1(pub *PublicKey, hash, sig []byte) bool {
 	}
 	boring.UnreachableExceptTests()
 
+	if is_sm2_curve(pub.Curve) {
+		return SM2VerifyASN1(pub, hash, sig, []byte(sm2_default_id))
+	}
+
 	switch pub.Curve.Params() {
 	case elliptic.P224().Params():
 		return verifyFIPS(ecdsa.P224(), pub, hash, sig)
@@ -519,6 +544,15 @@ func VerifyASN1(pub *PublicKey, hash, sig []byte) bool {
 	default:
 		return verifyLegacy(pub, hash, sig)
 	}
+}
+
+func SM2VerifyASN1(pub *PublicKey, hash, sig []byte, id []byte) bool {
+	rBytes, sBytes, err := parseSignature(sig)
+	if err != nil {
+		return false
+	}
+	r, s := new(big.Int).SetBytes(rBytes), new(big.Int).SetBytes(sBytes)
+	return sm2Verify(pub, hash, id, r, s)
 }
 
 func verifyFIPS[P ecdsa.Point[P]](c *ecdsa.Curve[P], pub *PublicKey, hash, sig []byte) bool {

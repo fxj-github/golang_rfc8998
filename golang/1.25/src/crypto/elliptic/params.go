@@ -325,7 +325,7 @@ func (curve *CurveParams) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 }
 
 func matchesSpecificCurve(params *CurveParams) (Curve, bool) {
-	for _, c := range []Curve{p224, p256, p384, p521} {
+	for _, c := range []Curve{p224, p256, p384, p521, sm2} {
 		if params == c.Params() {
 			return c, true
 		}

@@ -142,7 +142,7 @@ type unmarshaler interface {
 }
 
 // Assert that the known curves implement unmarshaler.
-var _ = []unmarshaler{p224, p256, p384, p521}
+var _ = []unmarshaler{p224, p256, p384, p521, sm2}
 
 // Unmarshal converts a point, serialized by [Marshal], into an x, y pair. It is
 // an error if the point is not in uncompressed form, is not on the curve, or is
@@ -228,6 +228,7 @@ func initAll() {
 	initP256()
 	initP384()
 	initP521()
+	initSM2()
 }
 
 // P224 returns a [Curve] which implements NIST P-224 (FIPS 186-3, section D.2.2),
@@ -277,4 +278,9 @@ func P384() Curve {
 func P521() Curve {
 	initonce.Do(initAll)
 	return p521
+}
+
+func SM2() Curve {
+	initonce.Do(initAll)
+	return sm2
 }
