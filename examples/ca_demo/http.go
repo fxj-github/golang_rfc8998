@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -113,12 +112,21 @@ func get_bundle(w http.ResponseWriter, r *http.Request, ca *CA) error {
 		return jsonError(w, err)
 	}
 
+	var cn string
+	cns, ok := r.Form["cn"]
+	if ok {
+		cn = cns[0]
+	} else {
+		return jsonError(w, fmt.Errorf("Missing 'cn'"))
+	}
+
 	var req string
 	reqs, ok := r.Form["valid_for"]
 	if ok {
 		req = reqs[0]
 	}
 	valid_for := 0
+	// 'valid_for' is optional
 	if req != "" {
 		n, err := strconv.ParseInt(req, 0, 0)
 		if err != nil || int(n) < 0 {
@@ -127,70 +135,59 @@ func get_bundle(w http.ResponseWriter, r *http.Request, ca *CA) error {
 		valid_for = int(n)
 	}
 
-	user_key, client_key, client_csr, client_crt, ca_crt, err := ca.getBundle("w", valid_for)
+	key_buf, cert_buf, ca_buf, crl_buf, err := ca.getBundle(cn, valid_for)
 	if err != nil {
 		return jsonError(w, err)
 	}
 
-	return build_zip_and_send(w, user_key, client_key, client_csr, client_crt, ca_crt)
+	return build_zip_and_send(w, key_buf, cert_buf, ca_buf, crl_buf)
 }
 
-func build_zip_and_send(w http.ResponseWriter, user_key, client_key, client_csr, client_crt, ca_crt []byte) error {
+func build_zip_and_send(w http.ResponseWriter, key_buf, cert_buf, ca_buf, crl_buf []byte) error {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 
 	header := &zip.FileHeader{ Method: zip.Deflate, Modified: time.Now() }
-	header.Name = "bundle/user.key"
+	header.Name = "bundle/" + key_file
 	header.SetMode(0600)
 	f, err := zw.CreateHeader(header)
 	if err != nil {
 		return jsonError(w, err)
 	}
-	if _, err = f.Write(user_key); err != nil {
+	if _, err = f.Write(key_buf); err != nil {
 		return jsonError(w, err)
 	}
 
 	header = &zip.FileHeader{ Method: zip.Deflate, Modified: time.Now() }
-	header.Name = "bundle/client.key"
+	header.Name = "bundle/" + cert_file
 	header.SetMode(0600)
 	f, err = zw.CreateHeader(header)
 	if err != nil {
 		return jsonError(w, err)
 	}
-	if _, err = f.Write(client_key); err != nil {
+	if _, err = f.Write(cert_buf); err != nil {
 		return jsonError(w, err)
 	}
 
 	header = &zip.FileHeader{ Method: zip.Deflate, Modified: time.Now() }
-	header.Name = "bundle/client.csr"
+	header.Name = "bundle/" + ca_file
 	header.SetMode(0644)
 	f, err = zw.CreateHeader(header)
 	if err != nil {
 		return jsonError(w, err)
 	}
-	if _, err = f.Write(client_csr); err != nil {
+	if _, err = f.Write(ca_buf); err != nil {
 		return jsonError(w, err)
 	}
 
 	header = &zip.FileHeader{ Method: zip.Deflate, Modified: time.Now() }
-	header.Name = "bundle/client.crt"
+	header.Name = "bundle/" + crl_file
 	header.SetMode(0644)
 	f, err = zw.CreateHeader(header)
 	if err != nil {
 		return jsonError(w, err)
 	}
-	if _, err = f.Write(client_crt); err != nil {
-		return jsonError(w, err)
-	}
-
-	header = &zip.FileHeader{ Method: zip.Deflate, Modified: time.Now() }
-	header.Name = "bundle/ca.crt"
-	header.SetMode(0644)
-	f, err = zw.CreateHeader(header)
-	if err != nil {
-		return jsonError(w, err)
-	}
-	if _, err = f.Write(ca_crt); err != nil {
+	if _, err = f.Write(crl_buf); err != nil {
 		return jsonError(w, err)
 	}
 
@@ -219,110 +216,6 @@ func read_one_file(f *zip.File) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-func update_bundle(w http.ResponseWriter, r *http.Request, ca *CA) error {
-	err := r.ParseMultipartForm(int64(ca.conf.MaxReqSize*1024*1024) * 3)
-	if err == nil {
-		defer r.MultipartForm.RemoveAll()
-	} else if err != http.ErrNotMultipart {
-		return jsonError(w, err)
-	}
-
-	var req string
-	reqs, ok := r.Form["req"]
-	if ok {
-		req = reqs[0]
-	}
-	if req == "" {
-		if r.MultipartForm == nil {
-			return jsonError(w, errors.New("Missing req"))
-		}
-
-		fhs, ok := r.MultipartForm.File["req"]
-		if !ok {
-			return jsonError(w, errors.New("Missing req"))
-		}
-		// This should never happen: see go/src/mime/multipart::ReadForm()
-		if len(fhs) < 1 {
-			return jsonError(w, errors.New("Invalid req: parse failed"))
-		}
-		file, err := fhs[0].Open()
-		if err != nil {
-			return jsonError(w, errors.New("Open req failed"))
-		}
-		got, _ := io.ReadAll(file)
-		file.Close()
-
-		req = string(got)
-	}
-
-	var v string
-	vs, ok := r.Form["valid_for"]
-	if ok {
-		v = vs[0]
-	}
-	valid_for := 0
-	if v != "" {
-		n, err := strconv.ParseInt(v, 0, 0)
-		if err != nil || int(n) < 0 {
-			return jsonError(w, fmt.Errorf("Invalid 'valid_for' format: %v", err))
-		}
-		valid_for = int(n)
-	}
-
-	zr, err := zip.NewReader(strings.NewReader(req), int64(len(req)))
-	if err != nil {
-		return jsonError(w, err)
-	}
-	user_key := []byte{}
-	client_key := []byte{}
-	client_csr := []byte{}
-	ca_crt := []byte{}
-	for i := 0; i < len(zr.File); i++ {
-		fi := zr.File[i]
-		if strings.HasSuffix(fi.Name, "user.key") {
-			user_key, err = read_one_file(fi)
-			if err != nil {
-				return jsonError(w, err)
-			}
-		} else if strings.HasSuffix(fi.Name, "client.key") {
-			client_key, err = read_one_file(fi)
-			if err != nil {
-				return jsonError(w, err)
-			}
-		} else if strings.HasSuffix(fi.Name, "client.csr") {
-			client_csr, err = read_one_file(fi)
-			if err != nil {
-				return jsonError(w, err)
-			}
-		} else if strings.HasSuffix(fi.Name, "client.crt") {
-			// Do nothing
-		} else if strings.HasSuffix(fi.Name, "ca.crt") {
-			ca_crt, err = read_one_file(fi)
-			if err != nil {
-				return jsonError(w, err)
-			}
-		} else {
-			return jsonError(w, fmt.Errorf("Unknown file name: %s", fi.Name))
-		}
-	}
-
-	this_ca_crt, err := ca.get_ca_cert()
-	if err != nil {
-		return jsonError(w, err)
-	}
-	if !bytes.Equal(ca_crt, this_ca_crt) {
-		clog.Warn("CA cert changed\n")
-		ca_crt = this_ca_crt
-	}
-
-	client_crt, err := ca.sign(string(client_csr), valid_for)
-	if err != nil {
-		return jsonError(w, err)
-	}
-
-	return build_zip_and_send(w, user_key, client_key, client_csr, []byte(client_crt), ca_crt)
 }
 
 type JResult struct {
@@ -385,7 +278,6 @@ func new_http_server(ca *CA) *http_server {
 	http.HandleFunc("/sign", func(w http.ResponseWriter, r *http.Request) { sign(w, r, ca) })
 	http.HandleFunc("/show", func(w http.ResponseWriter, r *http.Request) { show(w, r, ca) })
 	http.HandleFunc("/get_bundle", func(w http.ResponseWriter, r *http.Request) { get_bundle(w, r, ca) })
-	http.HandleFunc("/update_bundle", func(w http.ResponseWriter, r *http.Request) { update_bundle(w, r, ca) })
 
 	clog.Info("Listening on: %s:%d\n", ca.conf.Http_ip, ca.conf.Http_port)
 

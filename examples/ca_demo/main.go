@@ -96,7 +96,6 @@ func main() {
 		}
 
 		save_dir := "./"
-		key_file := "key.pem"
 		req := "test"
 
 		priv, err := LoadPrivKey(key_file)
@@ -280,7 +279,6 @@ func main() {
 	} else if flag.Arg(0) == "update_ca_cert" {
 		ca_ip := "127.0.0.1"
 		ca_port := 10003
-		ca_file := "ca.pem"
 
 		var client *ca_client
 		var err error
@@ -319,8 +317,6 @@ func main() {
 	} else if flag.Arg(0) == "update_crl" {
 		ca_ip := "127.0.0.1"
 		ca_port := 10003
-		ca_file := "ca.pem"
-		crl_file := "crl.pem"
 
 		var client *ca_client
 		var err error
@@ -363,9 +359,6 @@ func main() {
 	} else if flag.Arg(0) == "update_cert" {
 		ca_ip := "127.0.0.1"
 		ca_port := 10003
-		ca_file := "ca.pem"
-		key_file := "key.pem"
-		cert_file := "cert.pem"
 
 		var client *ca_client
 		var err error
@@ -429,10 +422,6 @@ func main() {
 
 		os.Exit(0)
 	} else if flag.Arg(0) == "show_cert" {
-		ca_file := "ca.pem"
-		cert_file := "cert.pem"
-		crl_file := "crl.pem"
-
 		ShowCert(ca_file, cert_file, crl_file)
 
 		os.Exit(0)

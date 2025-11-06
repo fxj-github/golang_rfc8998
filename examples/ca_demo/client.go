@@ -14,6 +14,14 @@ import (
 	"time"
 )
 
+const (
+	key_file = "key.pem"
+	cert_file = "cert.pem"
+
+	ca_file = "ca.pem"
+	crl_file = "crl.pem"
+)
+
 type ca_client struct {
 	client  *http.Client
 	address string

@@ -753,10 +753,10 @@ func (ca *CA) Show(req string, local bool) (string, error) {
 	return b.String(), nil
 }
 
-func (ca *CA) getBundle(req string, valid_for int) (user_key, client_key, client_csr, client_crt, ca_crt []byte, err error) {
-	// FIXME: 'req' should be a valid CommonName
-	if len(req) <= 0 {
-		err = errors.New("Invalid req")
+func (ca *CA) getBundle(cn string, valid_for int) (key_buf, cert_buf, ca_buf, crl_buf []byte, err error) {
+	// FIXME: 'cn' should be a valid CommonName
+	if len(cn) <= 0 {
+		err = errors.New("Invalid CN")
 		return
 	}
 
@@ -764,46 +764,36 @@ func (ca *CA) getBundle(req string, valid_for int) (user_key, client_key, client
 	if err != nil {
 		return
 	}
-	user_key, err = x509.MarshalPKCS8PrivateKey(priv)
+	key, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
 		return
 	}
-	var user_buf bytes.Buffer
-	err = pem.Encode(&user_buf, &pem.Block{Type: "PRIVATE KEY", Bytes: user_key})
+	var buf bytes.Buffer
+	err = pem.Encode(&buf, &pem.Block{Type: "PRIVATE KEY", Bytes: key})
 	if err != nil {
 		return
 	}
-	user_key = user_buf.Bytes()
-
-	priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return
-	}
-	client_key, err = x509.MarshalPKCS8PrivateKey(priv)
-	if err != nil {
-		return
-	}
-	var client_buf bytes.Buffer
-	err = pem.Encode(&client_buf, &pem.Block{Type: "PRIVATE KEY", Bytes: client_key})
-	if err != nil {
-		return
-	}
-	client_key = client_buf.Bytes()
+	key_buf = buf.Bytes()
 
 	params := &CaParams{Country: ca.conf.Country, Organization: ca.conf.Organization, OrganizationalUnit: ca.conf.OrganizationalUnit}
-	params.CommonName = req
-	client_csr, err = CreateCertificateRequest(params, priv)
+	params.CommonName = cn
+	// Certificate Signing Request
+	csr, err := CreateCertificateRequest(params, priv)
+	if err != nil {
+		return
+	}
+	cert_str, err := ca.sign(string(csr), valid_for)
+	if err != nil {
+		return
+	}
+	cert_buf = []byte(cert_str)
+
+	ca_buf, err = ca.get_ca_cert()
 	if err != nil {
 		return
 	}
 
-	client_crt_str, err := ca.sign(string(client_csr), valid_for)
-	if err != nil {
-		return
-	}
-	client_crt = []byte(client_crt_str)
-
-	ca_crt, err = ca.get_ca_cert()
+	crl_buf, err = ca.get_crl()
 	return
 }
 
