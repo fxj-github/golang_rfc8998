@@ -128,12 +128,27 @@ func main() {
 		os.Exit(0)
 	} else if flag.Arg(0) == "cinit" {
 		if flag.NArg() == 1 {
-			if err := CInit(""); err != nil {
+			if err := CInit("", true); err != nil {
 				clog.Fatal("%s\n", err)
 			}
 			os.Exit(0)
 		} else if flag.NArg() == 2 {
-			if err := CInit(flag.Arg(1)); err != nil {
+			if err := CInit(flag.Arg(1), true); err != nil {
+				clog.Fatal("%s\n", err)
+			}
+			os.Exit(0)
+		} else {
+			usage()
+			os.Exit(1)
+		}
+	} else if flag.Arg(0) == "cinit_p256" {
+		if flag.NArg() == 1 {
+			if err := CInit("", false); err != nil {
+				clog.Fatal("%s\n", err)
+			}
+			os.Exit(0)
+		} else if flag.NArg() == 2 {
+			if err := CInit(flag.Arg(1), false); err != nil {
 				clog.Fatal("%s\n", err)
 			}
 			os.Exit(0)

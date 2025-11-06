@@ -760,7 +760,12 @@ func (ca *CA) getBundle(cn string, valid_for int) (key_buf, cert_buf, ca_buf, cr
 		return
 	}
 
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var priv *ecdsa.PrivateKey
+	if ca.key.Curve == elliptic.SM2() {
+		priv, err = ecdsa.GenerateKey(elliptic.SM2(), rand.Reader)
+	} else {
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	}
 	if err != nil {
 		return
 	}
@@ -1148,14 +1153,20 @@ func LoadPrivKey(key_file string) (*ecdsa.PrivateKey, error) {
 	if !ok {
 		return nil, errors.New("Not an ECDSA private key")
 	}
-	if priv.Curve != elliptic.P256() {
-		return nil, errors.New("Not an ECDSA P256 private key")
+	if priv.Curve != elliptic.P256() && priv.Curve != elliptic.SM2() {
+		return nil, errors.New("Not an ECDSA P256/SM2 private key")
 	}
 	return priv, nil
 }
 
-func generate_key(key_file string) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func generate_key(key_file string, is_sm2 bool) {
+	var priv *ecdsa.PrivateKey
+	var err error
+	if is_sm2 {
+		priv, err = ecdsa.GenerateKey(elliptic.SM2(), rand.Reader)
+	} else {
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	}
 	if err != nil {
 		clog.Fatal("Failed to generate private key: %v\n", err)
 	}

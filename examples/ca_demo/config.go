@@ -89,7 +89,7 @@ func file_exist(file string) bool {
 	return true
 }
 
-func CInit(network_configs string) error {
+func CInit(network_configs string, is_sm2 bool) error {
 	if file_exist(ca_conf) {
 		return errors.New(fmt.Sprintf("%s already exist! Refuse to overwrite.", ca_conf))
 	}
@@ -139,7 +139,7 @@ func CInit(network_configs string) error {
 	clog.Info("%s created.\n", ca_conf)
 
 	os.Mkdir(ckey_dir, 0755)
-	generate_key(ckey_dir+ca_key_pem)
+	generate_key(ckey_dir+ca_key_pem, is_sm2)
 
 	return nil
 }
