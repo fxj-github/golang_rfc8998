@@ -17,7 +17,7 @@ var (
 func usage() {
 	fmt.Printf("\n")
 	fmt.Printf("Server usage:\n")
-	fmt.Printf("  %s [-v level] [-p dir] cinit [ http_ip/http_port ]\n", os.Args[0])
+	fmt.Printf("  %s [-v level] [-p dir] { cinit | cinit_p256 } [ http_ip/http_port ]\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] cconfig key value\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] crun\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] show [ serial | ski | ca | crl ]\n", os.Args[0])
