@@ -22,7 +22,6 @@ func usage() {
 	fmt.Printf("  %s [-v level] [-p dir] crun\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] show [ serial | ski | ca | crl ]\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] revoke serial\n", os.Args[0])
-	fmt.Printf("  %s [-v level] [-p dir] enable_sign { yes | no }\n", os.Args[0])
 	fmt.Printf("  %s [-v level] [-p dir] sign /path/to/request [ valid_for ]\n", os.Args[0])
 	fmt.Printf("\n")
 
@@ -225,29 +224,6 @@ func main() {
 		}
 
 		ca.Revoke(req)
-
-		ca.CloseDB()
-
-		os.Exit(0)
-	} else if flag.Arg(0) == "enable_sign" {
-		if flag.NArg() != 2 {
-			usage()
-			os.Exit(1)
-		}
-		req := flag.Arg(1)
-
-		// make sure we're an CA
-		_, err := CLoad(false)
-		if err != nil {
-			clog.Fatal("%s\n", err)
-		}
-
-		ca, err := NewCA_DB()
-		if err != nil {
-			clog.Fatal("%s\n", err)
-		}
-
-		ca.Enable_sign(req)
 
 		ca.CloseDB()
 

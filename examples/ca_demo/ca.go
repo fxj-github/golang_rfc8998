@@ -255,7 +255,7 @@ func init_db(priv *ecdsa.PrivateKey, conf *CConfig) (*sql.DB, error) {
 			goto err_close
 		}
 
-		stmt = fmt.Sprintf("INSERT INTO config(key,value) VALUES('enable_sign','yes'),('has_new_revoked_certs','no')")
+		stmt = fmt.Sprintf("INSERT INTO config(key,value) VALUES('has_new_revoked_certs','no')")
 		if _, err = tx.Exec(stmt); err != nil {
 			goto err_close
 		}
@@ -541,17 +541,7 @@ func (ca *CA) do_sign(tx *sql.Tx, subjectKeyId []byte, csr *x509.CertificateRequ
 		if time.Now().Before(deadline) {
 			return cert_bytes, nil
 		}
-	} else if err == sql.ErrNoRows {
-		var enable_sign string
-		stmt = fmt.Sprintf("SELECT value FROM config WHERE key='enable_sign';")
-		err = tx.QueryRow(stmt).Scan(&enable_sign)
-		if err != nil {
-			return nil, err
-		}
-		if enable_sign != "yes" {
-			return nil, e_deny
-		}
-	} else {
+	} else if err != sql.ErrNoRows {
 		return nil, err
 	}
 
@@ -857,53 +847,6 @@ func (ca *CA) Revoke(req string) {
 	tx.Commit()
 
 	clog.Info("Cert %s revoked.\n", req)
-	return
-
-rollback:
-	tx.Rollback()
-	return
-}
-
-func (ca *CA) Enable_sign(req string) {
-	if req != "yes" && req != "no" {
-		clog.Warn("Invalid req: %s\n", req)
-		return
-	}
-
-	tx, err := ca.db.Begin()
-	if err != nil {
-		clog.Warn("%v\n", err)
-		return
-	}
-
-	var enable_sign string
-	stmt := fmt.Sprintf("SELECT value FROM config WHERE key='enable_sign'")
-	err = tx.QueryRow(stmt).Scan(&enable_sign)
-	if err != nil {
-		clog.Warn("%v\n", req)
-		goto rollback
-	}
-	if enable_sign == req {
-		if req == "yes" {
-			clog.Info("Remote signing already enabled.\n")
-		} else {
-			clog.Info("Remote signing already disabled.\n")
-		}
-		goto rollback
-	}
-	stmt = fmt.Sprintf("UPDATE config SET value='%s' WHERE key='enable_sign'", req)
-	if _, err = tx.Exec(stmt); err != nil {
-		clog.Warn("%v\n", req)
-		goto rollback
-	}
-
-	tx.Commit()
-
-	if req == "yes" {
-		clog.Info("Remote signing enabled.\n")
-	} else {
-		clog.Info("Remote signing disabled.\n")
-	}
 	return
 
 rollback:
