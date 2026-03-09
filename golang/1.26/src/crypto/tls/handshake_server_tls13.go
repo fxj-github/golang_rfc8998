@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/hkdf"
 	"crypto/hmac"
 	"crypto/hpke"
@@ -866,6 +867,9 @@ func (hs *serverHandshakeStateTLS13) sendServerCertificate() error {
 	signOpts := crypto.SignerOpts(sigHash)
 	if sigType == signatureRSAPSS {
 		signOpts = &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: sigHash}
+	}
+	if hs.sigAlg == SM2SIG_SM3 {
+		signOpts = &ecdsa.SM2Options{ID: "TLSv1.3+GM+Cipher+Suite", Hash: sigHash}
 	}
 	sig, err := crypto.SignMessage(hs.cert.PrivateKey.(crypto.Signer), c.config.rand(), signed, signOpts)
 	if err != nil {

@@ -94,6 +94,8 @@ func keyExchangeForCurveID(id CurveID) (keyExchange, error) {
 		return &ecdhKeyExchange{id, ecdh.P384()}, nil
 	case CurveP521:
 		return &ecdhKeyExchange{id, ecdh.P521()}, nil
+	case CurveSM2:
+		return &ecdhKeyExchange{id, ecdh.SM2()}, nil
 	case X25519MLKEM768:
 		return &hybridKeyExchange{id, ecdhKeyExchange{X25519, ecdh.X25519()},
 			32, mlkem.EncapsulationKeySize768, mlkem.CiphertextSize768,

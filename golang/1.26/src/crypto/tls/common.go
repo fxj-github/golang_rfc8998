@@ -150,6 +150,7 @@ const (
 	CurveP384          CurveID = 24
 	CurveP521          CurveID = 25
 	X25519             CurveID = 29
+	CurveSM2           CurveID = 41
 	X25519MLKEM768     CurveID = 4588
 	SecP256r1MLKEM768  CurveID = 4587
 	SecP384r1MLKEM1024 CurveID = 4589
@@ -424,6 +425,9 @@ const (
 
 	// EdDSA algorithms.
 	Ed25519 SignatureScheme = 0x0807
+
+	// RFC 8998
+	SM2SIG_SM3 SignatureScheme = 0x0708
 
 	// Legacy signature and hash algorithms for TLS 1.2.
 	PKCS1WithSHA1 SignatureScheme = 0x0201
@@ -1467,6 +1471,8 @@ func (chi *ClientHelloInfo) SupportsCertificate(c *Certificate) error {
 				curve = CurveP384
 			case elliptic.P521():
 				curve = CurveP521
+			case elliptic.SM2():
+				curve = CurveSM2
 			default:
 				return supportsRSAFallback(unsupportedCertificateError(c))
 			}

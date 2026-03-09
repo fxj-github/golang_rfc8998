@@ -117,6 +117,17 @@ func ParseUncompressedPublicKey(curve elliptic.Curve, data []byte) (*PublicKey, 
 		return parseUncompressedPublicKey(ecdsa.P384(), curve, data)
 	case elliptic.P521():
 		return parseUncompressedPublicKey(ecdsa.P521(), curve, data)
+	case elliptic.SM2():
+		x, y := elliptic.Unmarshal(curve, cryptobyte.String(data))
+		if x == nil {
+			return nil, errors.New("ParseUncompressedPublicKey: failed to unmarshal SM2 curve point")
+		}
+		pub := &PublicKey{
+			Curve: curve,
+			X:     x,
+			Y:     y,
+		}
+		return pub, nil
 	default:
 		return nil, errors.New("ecdsa: curve not supported by ParseUncompressedPublicKey")
 	}
@@ -151,6 +162,11 @@ func (pub *PublicKey) Bytes() ([]byte, error) {
 		return publicKeyBytes(ecdsa.P384(), pub)
 	case elliptic.P521():
 		return publicKeyBytes(ecdsa.P521(), pub)
+	case elliptic.SM2():
+		if !pub.Curve.IsOnCurve(pub.X, pub.Y) {
+			return nil, errors.New("invalid SM2 public key")
+		}
+		return elliptic.Marshal(pub.Curve, pub.X, pub.Y), nil
 	default:
 		return nil, errors.New("ecdsa: curve not supported by PublicKey.Bytes")
 	}
@@ -202,6 +218,8 @@ func curveToECDH(c elliptic.Curve) ecdh.Curve {
 		return ecdh.P384()
 	case elliptic.P521():
 		return ecdh.P521()
+	case elliptic.SM2():
+		return ecdh.SM2()
 	default:
 		return nil
 	}
@@ -253,6 +271,17 @@ func ParseRawPrivateKey(curve elliptic.Curve, data []byte) (*PrivateKey, error) 
 		return parseRawPrivateKey(ecdsa.P384(), nistec.NewP384Point, curve, data)
 	case elliptic.P521():
 		return parseRawPrivateKey(ecdsa.P521(), nistec.NewP521Point, curve, data)
+	case elliptic.SM2():
+		k := new(big.Int).SetBytes(data)
+		curveOrder := curve.Params().N
+		if k.Cmp(curveOrder) >= 0 {
+			return nil, errors.New("invalid SM2 private key order")
+		}
+		priv := new(PrivateKey)
+		priv.Curve = curve
+		priv.D = k
+		priv.X, priv.Y = curve.ScalarBaseMult(data)
+		return priv, nil
 	default:
 		return nil, errors.New("ecdsa: curve not supported by ParseRawPrivateKey")
 	}
@@ -292,6 +321,10 @@ func (priv *PrivateKey) Bytes() ([]byte, error) {
 		return privateKeyBytes(ecdsa.P384(), priv)
 	case elliptic.P521():
 		return privateKeyBytes(ecdsa.P521(), priv)
+	case elliptic.SM2():
+		privateKey := make([]byte, (priv.Curve.Params().N.BitLen()+7)/8)
+		priv.D.FillBytes(privateKey)
+		return privateKey, nil
 	default:
 		return nil, errors.New("ecdsa: curve not supported by PrivateKey.Bytes")
 	}
@@ -321,6 +354,9 @@ func privateKeyBytes[P ecdsa.Point[P]](c *ecdsa.Curve[P], priv *PrivateKey) ([]b
 // function used to produce digest and priv.Curve must be one of
 // [elliptic.P224], [elliptic.P256], [elliptic.P384], or [elliptic.P521].
 func (priv *PrivateKey) Sign(random io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	if sm2opts, ok := opts.(*SM2Options); ok {
+		return signASN1(random, priv, digest, []byte(sm2opts.getID()))
+	}
 	if random == nil {
 		return signRFC6979(priv, digest, opts)
 	}
@@ -355,6 +391,7 @@ func GenerateKey(c elliptic.Curve, r io.Reader) (*PrivateKey, error) {
 	case elliptic.P521().Params():
 		return generateFIPS(c, ecdsa.P521(), r)
 	default:
+		// SM2
 		return generateLegacy(c, r)
 	}
 }
@@ -380,6 +417,10 @@ func generateFIPS[P ecdsa.Point[P]](curve elliptic.Curve, c *ecdsa.Curve[P], ran
 // is set. This setting will be removed in a future Go release. Instead, use
 // [testing/cryptotest.SetGlobalRandom].
 func SignASN1(r io.Reader, priv *PrivateKey, hash []byte) ([]byte, error) {
+	return signASN1(r, priv, hash, nil)
+}
+
+func signASN1(r io.Reader, priv *PrivateKey, hash []byte, id []byte) ([]byte, error) {
 	if boring.Enabled && rand.IsDefaultReader(r) {
 		b, err := boringPrivateKey(priv)
 		if err != nil {
@@ -400,6 +441,15 @@ func SignASN1(r io.Reader, priv *PrivateKey, hash []byte) ([]byte, error) {
 		return signFIPS(ecdsa.P384(), priv, r, hash)
 	case elliptic.P521().Params():
 		return signFIPS(ecdsa.P521(), priv, r, hash)
+	case elliptic.SM2().Params():
+		if id == nil {
+			id = []byte(sm2_default_id)
+		}
+		ri, si, err := sm2Sign(r, priv, hash, id)
+		if err != nil {
+			return nil, err
+		}
+		return encodeSignature(ri.Bytes(), si.Bytes())
 	default:
 		return signLegacy(priv, r, hash)
 	}
@@ -512,9 +562,20 @@ func VerifyASN1(pub *PublicKey, hash, sig []byte) bool {
 		return verifyFIPS(ecdsa.P384(), pub, hash, sig)
 	case elliptic.P521().Params():
 		return verifyFIPS(ecdsa.P521(), pub, hash, sig)
+	case elliptic.SM2().Params():
+		return SM2VerifyASN1(pub, hash, sig, []byte(sm2_default_id))
 	default:
 		return verifyLegacy(pub, hash, sig)
 	}
+}
+
+func SM2VerifyASN1(pub *PublicKey, hash, sig []byte, id []byte) bool {
+	rBytes, sBytes, err := parseSignature(sig)
+	if err != nil {
+		return false
+	}
+	r, s := new(big.Int).SetBytes(rBytes), new(big.Int).SetBytes(sBytes)
+	return sm2Verify(pub, hash, id, r, s)
 }
 
 func verifyFIPS[P ecdsa.Point[P]](c *ecdsa.Curve[P], pub *PublicKey, hash, sig []byte) bool {

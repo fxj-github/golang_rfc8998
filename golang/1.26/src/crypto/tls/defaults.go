@@ -22,14 +22,14 @@ func defaultCurvePreferences() []CurveID {
 	switch {
 	// tlsmlkem=0 restores the pre-Go 1.24 default.
 	case tlsmlkem.Value() == "0":
-		return []CurveID{X25519, CurveP256, CurveP384, CurveP521}
+		return []CurveID{X25519, CurveP256, CurveP384, CurveP521, CurveSM2}
 	// tlssecpmlkem=0 restores the pre-Go 1.26 default.
 	case tlssecpmlkem.Value() == "0":
-		return []CurveID{X25519MLKEM768, X25519, CurveP256, CurveP384, CurveP521}
+		return []CurveID{X25519MLKEM768, X25519, CurveP256, CurveP384, CurveP521, CurveSM2}
 	default:
 		return []CurveID{
 			X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024,
-			X25519, CurveP256, CurveP384, CurveP521,
+			X25519, CurveP256, CurveP384, CurveP521, CurveSM2,
 		}
 	}
 }
@@ -52,6 +52,7 @@ func defaultSupportedSignatureAlgorithms() []SignatureScheme {
 		ECDSAWithP521AndSHA512,
 		PKCS1WithSHA1,
 		ECDSAWithSHA1,
+		SM2SIG_SM3,
 	}
 }
 
@@ -93,6 +94,7 @@ var defaultCipherSuitesTLS13 = []uint16{
 	TLS_AES_128_GCM_SHA256,
 	TLS_AES_256_GCM_SHA384,
 	TLS_CHACHA20_POLY1305_SHA256,
+	TLS_SM4_GCM_SM3,
 }
 
 // defaultCipherSuitesTLS13NoAES should be an internal detail,
@@ -109,4 +111,5 @@ var defaultCipherSuitesTLS13NoAES = []uint16{
 	TLS_CHACHA20_POLY1305_SHA256,
 	TLS_AES_128_GCM_SHA256,
 	TLS_AES_256_GCM_SHA384,
+	TLS_SM4_GCM_SM3,
 }

@@ -338,6 +338,8 @@ func init() {
 		p256PrecomputedPtr = unsafe.Pointer(&newTable)
 	}
 	p256Precomputed = (*[43]p256AffineTable)(p256PrecomputedPtr)
+
+	sm2_init()
 }
 
 // p256SelectAffine sets res to the point at index idx in the table.
