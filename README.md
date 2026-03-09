@@ -26,13 +26,17 @@ SM3/SM4 参考 linux 内核的代码实现。
 git clone https://github.com/fxj-github/golang_rfc8998
 cd golang_rfc8998/golang
 git diff --binary 1d296f9b41871332de26c1bfa5b384704c59689d 1.25 > /tmp/go1.25.patch
+# for 1.26
+git diff --binary feb6b820f98df54de7ae8c11f16932e1a6ad5da7 1.26 > /tmp/go1.26.patch
 ```
 ### 把上述 patch 应用到本地 go 安装文件上 （这里可能需要切换成 root 用户或者使用 sudo):
 ```
 cd /path/to/go
 git apply --verbose -p3 < /tmp/go1.25.patch
+# for 1.26
+git apply --verbose -p3 < /tmp/go1.26.patch
 ```
-当前这个 patch 支持 golang 1.25.0/1.25.1/1.25.2/1.25.3。
+支持 golang 1.25.x/1.26.x。
 
 # 测试
 ```
